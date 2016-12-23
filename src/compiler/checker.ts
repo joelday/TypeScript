@@ -6315,13 +6315,20 @@ namespace ts {
          * this function should be called in a left folding style, with left = previous result of getSpreadType
          * and right = the new element to be spread.
          */
-        function getSpreadType(left: Type, right: Type, isFromObjectLiteral: boolean): Type  {
+        function getSpreadType(left: Type, right: Type, isFromObjectLiteral: boolean): Type {
             if (left.flags & TypeFlags.Any || right.flags & TypeFlags.Any) {
                 return anyType;
             }
             const id = getTypeListId([left, right]);
             if (id in spreadTypes) {
                 return spreadTypes[id];
+            }
+            // flatten intersections to objects if all member types are objects
+            if (left.flags & TypeFlags.Intersection) {
+                left = resolveObjectIntersection(left as IntersectionType);
+            }
+            if (right.flags & TypeFlags.Intersection) {
+                right = resolveObjectIntersection(right as IntersectionType);
             }
             left = filterType(left, t => !(t.flags & TypeFlags.Nullable));
             if (left.flags & TypeFlags.Never) {
@@ -6336,6 +6343,47 @@ namespace ts {
             }
             if (right.flags & TypeFlags.Union) {
                 return mapType(right, t => getSpreadType(left, t, isFromObjectLiteral));
+            }
+
+            // TODO: Probably should try to block these at both creation sites with an error
+            // (they are already blocked for object literals, but not for type literals)
+            if (left.flags & TypeFlags.Primitive && right.flags & TypeFlags.Primitive) {
+                return emptyObjectType;
+            }
+            if (left.flags & TypeFlags.Primitive) {
+                return right;
+            }
+            if (right.flags & TypeFlags.Primitive) {
+                return left;
+            }
+
+            // spread simplifications
+            // TODO: These should be in a separate function if that's possible.
+            if (left.flags & TypeFlags.Spread &&
+                right.flags & TypeFlags.TypeParameter &&
+                (left as SpreadType).right.flags & TypeFlags.TypeParameter &&
+                right.symbol === (left as SpreadType).right.symbol) {
+                // ... T ... T => ... T
+                return left;
+            }
+            if (left.flags & TypeFlags.Spread &&
+                right.flags & TypeFlags.Object &&
+                (left as SpreadType).right.flags & TypeFlags.Object) {
+                // simplify two adjacent object types: T ... { x } ... { y } => T ... { x, y }
+                const simplified = getSpreadType(right, (left as SpreadType).right, isFromObjectLiteral);
+                return getSpreadType((left as SpreadType).left, simplified, isFromObjectLiteral);
+            }
+            if (right.flags & TypeFlags.Spread) {
+                // spread is right associated and associativity applies, so
+                // (T ... U) ... V => T ... (U ... V)
+                const rspread = right as SpreadType;
+                if (rspread.left === emptyObjectType) {
+                    // ... U ... ({} ... T) => ... U ... T
+                    return getSpreadType(left, rspread.right, isFromObjectLiteral);
+                }
+                return getSpreadType(getSpreadType(left, rspread.left, isFromObjectLiteral),
+                                     rspread.right,
+                                     isFromObjectLiteral);
             }
 
             const members = createMap<Symbol>();
@@ -6388,6 +6436,21 @@ namespace ts {
                 }
             }
             return createAnonymousType(undefined, members, emptyArray, emptyArray, stringIndexInfo, numberIndexInfo);
+        }
+
+        function resolveObjectIntersection(intersection: IntersectionType): IntersectionType | ResolvedType {
+            if (find(intersection.types, t => !(t.flags & TypeFlags.Object))) {
+                return intersection;
+            }
+            // TODO: Why not getApparentType here?
+            const properties = getPropertiesOfType(intersection);
+            const members = createMap<Symbol>();
+            for (const property of properties) {
+                members[property.name] = property;
+            }
+            const stringIndex = getIndexInfoOfType(intersection, IndexKind.String);
+            const numberIndex = getIndexInfoOfType(intersection, IndexKind.Number);
+            return createAnonymousType(undefined, members, emptyArray, emptyArray, stringIndex, numberIndex);
         }
 
         function createLiteralType(flags: TypeFlags, text: string) {
@@ -11732,6 +11795,10 @@ namespace ts {
                         typeFlags = 0;
                     }
                     const type = checkExpression((memberDecl as SpreadAssignment).expression);
+                    if (type.flags & TypeFlags.Primitive) {
+                        error(memberDecl, Diagnostics.Spread_types_may_only_be_created_from_object_types);
+                        return unknownType;
+                    }
                     spread = getSpreadType(spread, type, /*isFromObjectLiteral*/ false);
                     offset = i + 1;
                     continue;
