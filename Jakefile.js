@@ -443,9 +443,9 @@ function compileFile(outFile, sources, prereqs, prefixes, useBuiltCompiler, opts
             if (opts.inlineSourceMap) {
                 options += " --inlineSourceMap --inlineSources";
             } else {
-                options += " -sourcemap";
+                options += " --inlineSourceMap";
                 if (!opts.noMapRoot) {
-                    options += " -mapRoot file:///" + path.resolve(path.dirname(outFile));
+                    // options += " -mapRoot file:///" + path.resolve(path.dirname(outFile));
                 }
             }
         } else {
