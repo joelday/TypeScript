@@ -47,17 +47,17 @@ class MyClass {
 >x : number
 >y : number
 
-	name?: string;
+    name?: string;
 >name : string
 
-	reqd: boolean;
+    reqd: boolean;
 >reqd : boolean
   }
 }
 
 // Let's use it
 // TODO: Error on missing 'reqd'
-var b1 = <MyClass reqd={true} />; 
+var b1 = <MyClass reqd={true} />;
 >b1 : any
 ><MyClass reqd={true} /> : any
 >MyClass : typeof MyClass
@@ -79,4 +79,67 @@ var b2 = <MyClass pt={{x: 4, y: 'oops'}} />;
 >y : string
 >'oops' : "oops"
 
+// A custom element type with an explicit children prop attribute type
+class MyParentClass {
+>MyParentClass : MyParentClass
+
+  props: {
+>props : { children?: MyClass[]; }
+
+    children?: MyClass[];
+>children : MyClass[]
+>MyClass : MyClass
+  }
+}
+
+// Correct child element type
+// Child element matches the children prop (OK)
+var d1 = <MyParentClass><MyClass reqd={true} /></MyParentClass>
+>d1 : any
+><MyParentClass><MyClass reqd={true} /></MyParentClass> : any
+>MyParentClass : typeof MyParentClass
+><MyClass reqd={true} /> : any
+>MyClass : typeof MyClass
+>reqd : any
+>true : true
+>MyParentClass : typeof MyParentClass
+
+// Conforms with type checking on element attribute (OK)
+var d2 = <MyParentClass children={[<MyClass reqd={true} />]}></MyParentClass>
+>d2 : any
+><MyParentClass children={[<MyClass reqd={true} />]}></MyParentClass> : any
+>MyParentClass : typeof MyParentClass
+>children : any
+>[<MyClass reqd={true} />] : any[]
+><MyClass reqd={true} /> : any
+>MyClass : typeof MyClass
+>reqd : any
+>true : true
+>MyParentClass : typeof MyParentClass
+
+// Incorrect child element type
+// sample.tsx(23,22): error TS2322: Type 'HTMLProps<HTMLDivElement>' is not assignable to type 'MyClass'.
+var d3 = <MyParentClass><div></div><MyClass reqd={true} /></MyParentClass>
+>d3 : any
+><MyParentClass><div></div><MyClass reqd={true} /></MyParentClass> : any
+>MyParentClass : typeof MyParentClass
+><div></div> : any
+>div : any
+>div : any
+><MyClass reqd={true} /> : any
+>MyClass : typeof MyClass
+>reqd : any
+>true : true
+>MyParentClass : typeof MyParentClass
+
+// sample.tsx(23,22): error TS2322: Type 'HTMLProps<HTMLDivElement>' is not assignable to type 'MyClass'.
+var d4 = <MyParentClass children={[<div />]}></MyParentClass>
+>d4 : any
+><MyParentClass children={[<div />]}></MyParentClass> : any
+>MyParentClass : typeof MyParentClass
+>children : any
+>[<div />] : any[]
+><div /> : any
+>div : any
+>MyParentClass : typeof MyParentClass
 

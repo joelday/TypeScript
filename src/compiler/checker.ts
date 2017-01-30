@@ -11825,6 +11825,54 @@ namespace ts {
             return jsxElementType || anyType;
         }
 
+        function findJsxElementParent(node: JsxOpeningLikeElement) {
+            let parent = node.parent;
+
+            while (parent) {
+                if (parent.kind == SyntaxKind.JsxElement && (<JsxElement>parent).openingElement !== node) {
+                    return (<JsxElement>parent).openingElement;
+                }
+
+                parent = parent.parent;
+            }
+
+            return;
+        }
+
+        /**
+         * Validates a JsxElement against the type of the 'children' attribute of its parent
+         */
+        function checkJsxElementAgainstParent(node: JsxOpeningLikeElement) {
+            const parent = findJsxElementParent(node);
+            if (!parent) {
+                return;
+            }
+
+            const parentAttributesType = getJsxElementAttributesType(parent);
+            if (!parentAttributesType || isTypeAny(parentAttributesType)) {
+                return;
+            }
+
+            const childrenPropSymbol = getPropertyOfType(parentAttributesType, "children");
+            if (!childrenPropSymbol) {
+                return;
+            }
+
+            let childrenPropType = getTypeOfSymbol(childrenPropSymbol);
+            if (isArrayLikeType(childrenPropType)) {
+                childrenPropType = getIndexTypeOfType(childrenPropType, IndexKind.Number);
+            }
+
+            const intrinsicTagType = isJsxIntrinsicIdentifier(node.tagName) ? getTypeOfSymbol(getIntrinsicTagSymbol(node)) : undefined;
+
+            const elementType = intrinsicTagType || getJsxElementInstanceType(node, getTypeOfNode(node.tagName));
+            if (!elementType) {
+                return;
+            }
+
+            checkTypeAssignableTo(elementType, childrenPropType, node);
+        }
+
         function checkJsxElement(node: JsxElement) {
             // Check attributes
             checkJsxOpeningLikeElement(node.openingElement);
@@ -12240,6 +12288,7 @@ namespace ts {
         function checkJsxOpeningLikeElement(node: JsxOpeningLikeElement) {
             checkGrammarJsxElement(node);
             checkJsxPreconditions(node);
+            checkJsxElementAgainstParent(node);
             // The reactNamespace/jsxFactory's root symbol should be marked as 'used' so we don't incorrectly elide its import.
             // And if there is no reactNamespace/jsxFactory's symbol in scope when targeting React emit, we should issue an error.
             const reactRefErr = compilerOptions.jsx === JsxEmit.React ? Diagnostics.Cannot_find_name_0 : undefined;

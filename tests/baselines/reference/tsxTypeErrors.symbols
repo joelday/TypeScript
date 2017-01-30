@@ -41,17 +41,17 @@ class MyClass {
 >x : Symbol(x, Decl(tsxTypeErrors.tsx, 17, 10))
 >y : Symbol(y, Decl(tsxTypeErrors.tsx, 17, 21))
 
-	name?: string;
+    name?: string;
 >name : Symbol(name, Decl(tsxTypeErrors.tsx, 17, 35))
 
-	reqd: boolean;
->reqd : Symbol(reqd, Decl(tsxTypeErrors.tsx, 18, 15))
+    reqd: boolean;
+>reqd : Symbol(reqd, Decl(tsxTypeErrors.tsx, 18, 18))
   }
 }
 
 // Let's use it
 // TODO: Error on missing 'reqd'
-var b1 = <MyClass reqd={true} />; 
+var b1 = <MyClass reqd={true} />;
 >b1 : Symbol(b1, Decl(tsxTypeErrors.tsx, 25, 3))
 >MyClass : Symbol(MyClass, Decl(tsxTypeErrors.tsx, 12, 31))
 >reqd : Symbol(unknown)
@@ -67,4 +67,53 @@ var b2 = <MyClass pt={{x: 4, y: 'oops'}} />;
 >x : Symbol(x, Decl(tsxTypeErrors.tsx, 31, 23))
 >y : Symbol(y, Decl(tsxTypeErrors.tsx, 31, 28))
 
+// A custom element type with an explicit children prop attribute type
+class MyParentClass {
+>MyParentClass : Symbol(MyParentClass, Decl(tsxTypeErrors.tsx, 31, 44))
+
+  props: {
+>props : Symbol(MyParentClass.props, Decl(tsxTypeErrors.tsx, 34, 21))
+
+    children?: MyClass[];
+>children : Symbol(children, Decl(tsxTypeErrors.tsx, 35, 10))
+>MyClass : Symbol(MyClass, Decl(tsxTypeErrors.tsx, 12, 31))
+  }
+}
+
+// Correct child element type
+// Child element matches the children prop (OK)
+var d1 = <MyParentClass><MyClass reqd={true} /></MyParentClass>
+>d1 : Symbol(d1, Decl(tsxTypeErrors.tsx, 42, 3))
+>MyParentClass : Symbol(MyParentClass, Decl(tsxTypeErrors.tsx, 31, 44))
+>MyClass : Symbol(MyClass, Decl(tsxTypeErrors.tsx, 12, 31))
+>reqd : Symbol(unknown)
+>MyParentClass : Symbol(MyParentClass, Decl(tsxTypeErrors.tsx, 31, 44))
+
+// Conforms with type checking on element attribute (OK)
+var d2 = <MyParentClass children={[<MyClass reqd={true} />]}></MyParentClass>
+>d2 : Symbol(d2, Decl(tsxTypeErrors.tsx, 44, 3))
+>MyParentClass : Symbol(MyParentClass, Decl(tsxTypeErrors.tsx, 31, 44))
+>children : Symbol(unknown)
+>MyClass : Symbol(MyClass, Decl(tsxTypeErrors.tsx, 12, 31))
+>reqd : Symbol(unknown)
+>MyParentClass : Symbol(MyParentClass, Decl(tsxTypeErrors.tsx, 31, 44))
+
+// Incorrect child element type
+// sample.tsx(23,22): error TS2322: Type 'HTMLProps<HTMLDivElement>' is not assignable to type 'MyClass'.
+var d3 = <MyParentClass><div></div><MyClass reqd={true} /></MyParentClass>
+>d3 : Symbol(d3, Decl(tsxTypeErrors.tsx, 48, 3))
+>MyParentClass : Symbol(MyParentClass, Decl(tsxTypeErrors.tsx, 31, 44))
+>div : Symbol(unknown)
+>div : Symbol(unknown)
+>MyClass : Symbol(MyClass, Decl(tsxTypeErrors.tsx, 12, 31))
+>reqd : Symbol(unknown)
+>MyParentClass : Symbol(MyParentClass, Decl(tsxTypeErrors.tsx, 31, 44))
+
+// sample.tsx(23,22): error TS2322: Type 'HTMLProps<HTMLDivElement>' is not assignable to type 'MyClass'.
+var d4 = <MyParentClass children={[<div />]}></MyParentClass>
+>d4 : Symbol(d4, Decl(tsxTypeErrors.tsx, 50, 3))
+>MyParentClass : Symbol(MyParentClass, Decl(tsxTypeErrors.tsx, 31, 44))
+>children : Symbol(unknown)
+>div : Symbol(unknown)
+>MyParentClass : Symbol(MyParentClass, Decl(tsxTypeErrors.tsx, 31, 44))
 
